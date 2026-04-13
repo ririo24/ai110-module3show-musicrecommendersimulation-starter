@@ -33,21 +33,20 @@ The way that major streaming services predict what users would like to hear next
 
 Algorithm Recipe:
 score =
-  mood match: +2.0  if user.mood  == song.mood  else +0.0
-  genre match: +1.5  if user.genre == song.genre else +0.0
-  energy: +2.0 × (1 - |user.energy - song.energy|)
-  valence: +1.5  × (1 - |user.valence - song.valence|)
-  acousticness: +1.0 × (1 - |user.acousticness - song.acousticness|)
-  dancebility: +0.8 × (1 - |user.danceability - song.danceability|)
-  speechiness: +0.5 × (1 - |user.speechiness - song.speechiness|)
-  instrumentalness: +0.5 × (1 - |user.instrumentalness - song.instrumentalness|)
-  tempo: +0.2 × (1 - |user.tempo_norm - song.tempo_norm|)
+mood match: +2.0  if user.mood  == song.mood  else +0.0
+genre match: +1.5  if user.genre == song.genre else +0.0
+energy: +2.0 × (1 - |user.energy - song.energy|)
+valence: +1.5  × (1 - |user.valence - song.valence|)
+acousticness: +1.0 × (1 - |user.acousticness - song.acousticness|)
+dancebility: +0.8 × (1 - |user.danceability - song.danceability|)
+speechiness: +0.5 × (1 - |user.speechiness - song.speechiness|)
+instrumentalness: +0.5 × (1 - |user.instrumentalness - song.instrumentalness|)
+tempo: +0.2 × (1 - |user.tempo_norm - song.tempo_norm|)
 
 The max possible score is 10.0.
 The system prioritizes mood over genre since I think users care more about their feelings in the moment when listening to a song. Given that, I choose to weigh mood greater than genre. The system will likely prioritize the engery of a song since dancebility and tempo are pretty similar to energy.
 
 <a href="musicRecommenderIMG1.png" target="_blank"><img src="musicRecommenderIMG1.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 1" /></a>
-
 <a href="musicRecommenderIMG2.png" target="_blank"><img src="musicRecommenderIMG2.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 2" /></a>
 ---
 
