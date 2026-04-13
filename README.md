@@ -29,7 +29,25 @@ Some prompts to answer:
 
 You can include a simple diagram or bullet list if helpful.
 
-The 
+The way that major streaming services predict what users would like to hear next is by eiether looking at patterns across users or by analyzing song attributes and matching them to the users taste profile. Streaming services that focus on people who are similiar to the user either find users with similar taste and recommend what they liked or find songs that are often listened to/liked together and they recommond similarly liked songs. Some platforms do both where they find someone of similar taste and then have you listen to songs from their libraries that you might've not heard before. My version will prioritize more the content of a song rather than the taste profiles of other users. The UserProfile will do the scoring rule and ranking rule for each user and then recommend the top songs. Each song will have be scored on genre, mood, energy, tempo_bpm, speechiness,instrumentalness, valence, danceability, and acousticness.
+
+Algorithm Recipe:
+score =
+  mood match: +2.0  if user.mood  == song.mood  else +0.0
+  genre match: +1.5  if user.genre == song.genre else +0.0
+  energy: +2.0 × (1 - |user.energy - song.energy|)
+  valence: +1.5  × (1 - |user.valence - song.valence|)
+  acousticness: +1.0 × (1 - |user.acousticness - song.acousticness|)
+  dancebility: +0.8 × (1 - |user.danceability - song.danceability|)
+  speechiness: +0.5 × (1 - |user.speechiness - song.speechiness|)
+  instrumentalness: +0.5 × (1 - |user.instrumentalness - song.instrumentalness|)
+  tempo: +0.2 × (1 - |user.tempo_norm - song.tempo_norm|)
+
+The max possible score is 10.0.
+The system prioritizes mood over genre since I think users care more about their feelings in the moment when listening to a song. Given that, I choose to weigh mood greater than genre. The system will likely prioritize the engery of a song since dancebility and tempo are pretty similar to energy.
+
+<a href="musicRecommenderIMG1.png" target="_blank"><img src="musicRecommenderIMG1.png" title="Music Recommender" width="700" alt="Music Recommender Terminal Output" /></a>
+
 
 ---
 
