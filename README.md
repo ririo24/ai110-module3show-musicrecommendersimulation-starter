@@ -46,9 +46,9 @@ score =
 The max possible score is 10.0.
 The system prioritizes mood over genre since I think users care more about their feelings in the moment when listening to a song. Given that, I choose to weigh mood greater than genre. The system will likely prioritize the engery of a song since dancebility and tempo are pretty similar to energy.
 
-<a href="musicRecommenderIMG1.png" target="_blank"><img src="musicRecommenderIMG1.png" title="Music Recommender" width="700" alt="Music Recommender Terminal Output" /></a>
+<a href="musicRecommenderIMG1.png" target="_blank"><img src="musicRecommenderIMG1.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 1" /></a>
 
-
+<a href="musicRecommenderIMG2.png" target="_blank"><img src="musicRecommenderIMG2.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 2" /></a>
 ---
 
 ## Getting Started
