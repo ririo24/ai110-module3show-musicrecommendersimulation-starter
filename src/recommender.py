@@ -1,5 +1,6 @@
 from typing import List, Dict, Tuple, Optional
 from dataclasses import dataclass
+import csv
 
 @dataclass
 class Song:
@@ -111,27 +112,103 @@ class Recommender:
         self.songs = songs
 
     def recommend(self, user: UserProfile, k: int = 5) -> List[Song]:
+        """Return the top k songs ranked by score for the given user profile."""
         # TODO: Implement recommendation logic
         return self.songs[:k]
 
     def explain_recommendation(self, user: UserProfile, song: Song) -> str:
+        """Return a human-readable string explaining why a song was recommended."""
         # TODO: Implement explanation logic
         return "Explanation placeholder"
 
 def load_songs(csv_path: str) -> List[Dict]:
-    """
-    Loads songs from a CSV file.
-    Required by src/main.py
-    """
-    # TODO: Implement CSV loading logic
+    """Parse a CSV file of songs and return a list of dicts with typed values."""
     print(f"Loading songs from {csv_path}...")
-    return []
+    songs = []
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            songs.append({
+                "id":               int(row["id"]),
+                "title":            row["title"],
+                "artist":           row["artist"],
+                "genre":            row["genre"],
+                "mood":             row["mood"],
+                "energy":           float(row["energy"]),
+                "tempo_bpm":        float(row["tempo_bpm"]),
+                "valence":          float(row["valence"]),
+                "danceability":     float(row["danceability"]),
+                "acousticness":     float(row["acousticness"]),
+                "speechiness":      float(row.get("speechiness", 0.05)),
+                "instrumentalness": float(row.get("instrumentalness", 0.10)),
+            })
+    print(f"  Loaded {len(songs)} songs.")
+    return songs
+
+def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
+    """Score one song against user preferences (0.0–10.0) and return a list of reasons."""
+    TEMPO_MIN, TEMPO_MAX = 60.0, 180.0
+    score = 0.0
+    reasons = []
+
+    # --- Categorical: mood (+2.0 exact match, else +0.0) ---
+    if user_prefs.get("mood") == song["mood"]:
+        score += 2.0
+        reasons.append(f"mood match: '{song['mood']}' (+2.0)")
+    else:
+        reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
+
+    # --- Categorical: genre (+1.5 exact match, else +0.0) ---
+    if user_prefs.get("genre") == song["genre"]:
+        score += 1.5
+        reasons.append(f"genre match: '{song['genre']}' (+1.5)")
+    else:
+        reasons.append(f"genre: no match ('{user_prefs.get('genre')}' ≠ '{song['genre']}') (+0.0)")
+
+    # --- Numeric: energy (+2.0 max) ---
+    energy_pts = 2.0 * (1 - abs(user_prefs.get("energy", 0.5) - song["energy"]))
+    score += energy_pts
+    reasons.append(f"energy {song['energy']:.2f} vs target {user_prefs.get('energy', 0.5):.2f} (+{energy_pts:.2f})")
+
+    # --- Numeric: valence (+1.5 max) ---
+    valence_pts = 1.5 * (1 - abs(user_prefs.get("target_valence", 0.5) - song["valence"]))
+    score += valence_pts
+    reasons.append(f"valence {song['valence']:.2f} vs target {user_prefs.get('target_valence', 0.5):.2f} (+{valence_pts:.2f})")
+
+    # --- Numeric: acousticness (+1.0 max) ---
+    target_acousticness = 0.78 if user_prefs.get("likes_acoustic", False) else 0.18
+    acousticness_pts = 1.0 * (1 - abs(target_acousticness - song["acousticness"]))
+    score += acousticness_pts
+    reasons.append(f"acousticness {song['acousticness']:.2f} vs target {target_acousticness:.2f} (+{acousticness_pts:.2f})")
+
+    # --- Numeric: danceability (+0.8 max) ---
+    dance_pts = 0.8 * (1 - abs(user_prefs.get("target_danceability", 0.5) - song["danceability"]))
+    score += dance_pts
+    reasons.append(f"danceability {song['danceability']:.2f} vs target {user_prefs.get('target_danceability', 0.5):.2f} (+{dance_pts:.2f})")
+
+    # --- Numeric: speechiness (+0.5 max) ---
+    speech_pts = 0.5 * (1 - abs(user_prefs.get("target_speechiness", 0.05) - song["speechiness"]))
+    score += speech_pts
+    reasons.append(f"speechiness {song['speechiness']:.2f} vs target {user_prefs.get('target_speechiness', 0.05):.2f} (+{speech_pts:.2f})")
+
+    # --- Numeric: instrumentalness (+0.5 max) ---
+    instr_pts = 0.5 * (1 - abs(user_prefs.get("target_instrumentalness", 0.30) - song["instrumentalness"]))
+    score += instr_pts
+    reasons.append(f"instrumentalness {song['instrumentalness']:.2f} vs target {user_prefs.get('target_instrumentalness', 0.30):.2f} (+{instr_pts:.2f})")
+
+    # --- Numeric: tempo (+0.2 max, normalized to 0–1 before comparison) ---
+    song_tempo_norm = (song["tempo_bpm"] - TEMPO_MIN) / (TEMPO_MAX - TEMPO_MIN)
+    user_tempo_norm = (user_prefs.get("target_tempo_bpm", 100.0) - TEMPO_MIN) / (TEMPO_MAX - TEMPO_MIN)
+    tempo_pts = 0.2 * (1 - abs(user_tempo_norm - song_tempo_norm))
+    score += tempo_pts
+    reasons.append(f"tempo {song['tempo_bpm']:.0f} BPM vs target {user_prefs.get('target_tempo_bpm', 100.0):.0f} BPM (+{tempo_pts:.2f})")
+
+    return score, reasons
 
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """
-    Functional implementation of the recommendation logic.
-    Required by src/main.py
-    """
-    # TODO: Implement scoring and ranking logic
-    # Expected return format: (song_dict, score, explanation)
-    return []
+    """Score every song in the catalog and return the top k as (song, score, explanation) tuples."""
+    scored = []
+    for song in songs:
+        score, reasons = score_song(user_prefs, song)
+        scored.append((song, score, " | ".join(reasons)))
+
+    return sorted(scored, key=lambda x: x[1], reverse=True)[:k]
