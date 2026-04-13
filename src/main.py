@@ -9,7 +9,7 @@ You will implement the functions in recommender.py:
 - recommend_songs
 """
 
-from recommender import load_songs, recommend_songs
+from recommender import load_songs, recommend_songs, STRATEGY_WEIGHTS
 
 
 PROFILES = {
@@ -142,17 +142,44 @@ def print_recommendations(profile_name: str, user_prefs: dict, recommendations: 
     print()
 
 
+def print_diversity_comparison(profile_name: str, user_prefs: dict,
+                               songs: list, k: int = 5) -> None:
+    """Print side-by-side: top-k without diversity vs with diversity penalties."""
+    without = recommend_songs(user_prefs, songs, k=k, strategy="balanced")
+    with_div = recommend_songs(user_prefs, songs, k=k, strategy="balanced",
+                               artist_penalty=2.0, genre_penalty=1.0)
+
+    width = 26
+    print()
+    print("=" * 56)
+    print(f"  DIVERSITY COMPARISON — {profile_name.upper()}")
+    print(f"  artist_penalty=2.0  |  genre_penalty=1.0")
+    print("=" * 56)
+    print(f"  {'NO DIVERSITY':<{width}}  {'WITH DIVERSITY':<{width}}")
+    print("  " + "-" * 54)
+    for i, ((s1, sc1, _), (s2, sc2, _)) in enumerate(zip(without, with_div), 1):
+        left  = f"#{i} {s1['title']} ({sc1:.1f})"
+        right = f"#{i} {s2['title']} ({sc2:.1f})"
+        marker = "  " if s1["title"] == s2["title"] else "←"
+        print(f"  {left:<{width}}  {right:<{width}} {marker}")
+    print()
+
+
 def main() -> None:
     songs = load_songs("data/songs.csv")
 
-    # --- Standard profiles, each run under all four strategies ---
-    # Swap the strategy name to see how rankings shift.
+    # --- Standard profiles across all strategies ---
     for profile_name, user_prefs in PROFILES.items():
         for strategy in ("balanced", "genre_first", "mood_first", "energy_focused"):
             recommendations = recommend_songs(user_prefs, songs, k=3, strategy=strategy)
             print_recommendations(profile_name, user_prefs, recommendations, strategy=strategy)
 
-    # --- Adversarial profiles (balanced strategy only) ---
+    # --- Diversity comparison (Chill Lofi best demonstrates artist clustering) ---
+    print_diversity_comparison("Chill Lofi",         PROFILES["Chill Lofi"],        songs, k=5)
+    print_diversity_comparison("High-Energy Pop",    PROFILES["High-Energy Pop"],   songs, k=5)
+    print_diversity_comparison("Deep Intense Rock",  PROFILES["Deep Intense Rock"], songs, k=5)
+
+    # --- Adversarial profiles ---
     for profile_name, user_prefs in ADVERSARIAL_PROFILES.items():
         recommendations = recommend_songs(user_prefs, songs, k=3)
         print_recommendations(profile_name, user_prefs, recommendations, adversarial=True)

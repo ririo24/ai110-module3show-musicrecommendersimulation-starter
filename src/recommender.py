@@ -325,11 +325,64 @@ def score_song(user_prefs: Dict, song: Dict,
 
     return score, reasons
 
+def _apply_diversity(
+    scored: List[Tuple[Dict, float, str]],
+    k: int,
+    artist_penalty: float,
+    genre_penalty: float,
+) -> List[Tuple[Dict, float, str]]:
+    """Greedy diversity-aware selection.
+
+    Iterates through the pre-sorted scored list and picks songs one slot at a
+    time. Each time a song is considered, its effective score is reduced by:
+      artist_penalty × (how many times that artist is already in results)
+      genre_penalty  × (how many times that genre  is already in results)
+
+    This prevents the same artist or genre from monopolising the top-K list
+    without hard-filtering anything out.
+    """
+    remaining = list(scored)          # mutable copy, sorted by raw score
+    selected: List[Tuple[Dict, float, str]] = []
+    artist_seen: Dict[str, int] = {}
+    genre_seen:  Dict[str, int] = {}
+
+    while len(selected) < k and remaining:
+        # Find the candidate with the highest diversity-adjusted score
+        def adjusted(item: Tuple) -> float:
+            s, score, _ = item
+            return (score
+                    - artist_seen.get(s["artist"], 0) * artist_penalty
+                    - genre_seen.get(s["genre"],  0) * genre_penalty)
+
+        best_idx = max(range(len(remaining)), key=lambda i: adjusted(remaining[i]))
+        song, raw_score, explanation = remaining.pop(best_idx)
+
+        penalty = (artist_seen.get(song["artist"], 0) * artist_penalty
+                 + genre_seen.get(song["genre"],  0) * genre_penalty)
+        adj_score = raw_score - penalty
+
+        if penalty > 0:
+            explanation += (f" | diversity penalty: -{penalty:.2f}"
+                            f" ({artist_seen.get(song['artist'],0)}× artist,"
+                            f" {genre_seen.get(song['genre'],0)}× genre)")
+
+        selected.append((song, adj_score, explanation))
+        artist_seen[song["artist"]] = artist_seen.get(song["artist"], 0) + 1
+        genre_seen[song["genre"]]   = genre_seen.get(song["genre"],  0) + 1
+
+    return selected
+
+
 def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5,
-                    strategy: str = "balanced") -> List[Tuple[Dict, float, str]]:
+                    strategy: str = "balanced",
+                    artist_penalty: float = 0.0,
+                    genre_penalty: float = 0.0) -> List[Tuple[Dict, float, str]]:
     """Score every song in the catalog and return the top k as (song, score, explanation) tuples.
 
-    Pass strategy='genre_first', 'mood_first', or 'energy_focused' to change ranking behaviour.
+    strategy       — one of 'balanced', 'genre_first', 'mood_first', 'energy_focused'
+    artist_penalty — score deducted per additional song from the same artist (e.g. 2.0)
+    genre_penalty  — score deducted per additional song from the same genre  (e.g. 1.0)
+    Set both to 0.0 (default) to disable diversity enforcement.
     """
     weights = STRATEGY_WEIGHTS.get(strategy, STRATEGY_WEIGHTS["balanced"])
     scored = []
@@ -337,4 +390,9 @@ def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5,
         score, reasons = score_song(user_prefs, song, weights=weights)
         scored.append((song, score, " | ".join(reasons)))
 
-    return sorted(scored, key=lambda x: x[1], reverse=True)[:k]
+    scored.sort(key=lambda x: x[1], reverse=True)
+
+    if artist_penalty > 0 or genre_penalty > 0:
+        return _apply_diversity(scored, k, artist_penalty, genre_penalty)
+
+    return scored[:k]
