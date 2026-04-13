@@ -1,5 +1,5 @@
 from typing import List, Dict, Tuple, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import csv
 
 @dataclass
@@ -18,6 +18,14 @@ class Song:
     valence: float
     danceability: float
     acousticness: float
+    speechiness: float = 0.05
+    instrumentalness: float = 0.10
+    # New attributes
+    popularity: int = 50
+    release_decade: int = 2010
+    liveness: float = 0.10
+    explicit: int = 0
+    mood_tags: str = ""
 
 @dataclass
 class UserProfile:
@@ -39,6 +47,13 @@ class UserProfile:
     target_tempo_bpm: float = 100.0
     target_speechiness: float = 0.05
     target_instrumentalness: float = 0.30
+    # New preference fields
+    target_popularity: float = 50.0
+    popularity_preference: str = "neutral"   # "mainstream", "underground", or "neutral"
+    target_decade: int = 2010
+    target_liveness: float = 0.15
+    allow_explicit: bool = True
+    desired_mood_tags: List[str] = field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -140,6 +155,11 @@ def load_songs(csv_path: str) -> List[Dict]:
                 "acousticness":     float(row["acousticness"]),
                 "speechiness":      float(row.get("speechiness", 0.05)),
                 "instrumentalness": float(row.get("instrumentalness", 0.10)),
+                "popularity":       int(row.get("popularity", 50)),
+                "release_decade":   int(row.get("release_decade", 2010)),
+                "liveness":         float(row.get("liveness", 0.10)),
+                "explicit":         int(row.get("explicit", 0)),
+                "mood_tags":        row.get("mood_tags", "").split("|"),
             })
     print(f"  Loaded {len(songs)} songs.")
     return songs
@@ -147,21 +167,23 @@ def load_songs(csv_path: str) -> List[Dict]:
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     """Score one song against user preferences and return a list of reasons.
 
-    EXPERIMENT — mood check disabled. Max possible score is now 8.0 (was 10.0).
-    Re-enable the mood block below to restore full scoring.
+    Score breakdown (max ~13.7):
+      Original features  — mood(2.0) genre(1.5) energy(2.0) valence(1.5)
+                           acousticness(1.0) danceability(0.8) speechiness(0.5)
+                           instrumentalness(0.5) tempo(0.2)          = 10.0
+      New features       — mood_tags(1.5) popularity(0.8) decade(0.7)
+                           liveness(0.4) explicit(0.3)               =  3.7
     """
     TEMPO_MIN, TEMPO_MAX = 60.0, 180.0
     score = 0.0
     reasons = []
 
     # --- Categorical: mood (+2.0 exact match, else +0.0) ---
-    # DISABLED for sensitivity experiment — comment back in to restore
-    # if user_prefs.get("mood") == song["mood"]:
-    #     score += 2.0
-    #     reasons.append(f"mood match: '{song['mood']}' (+2.0)")
-    # else:
-    #     reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
-    reasons.append(f"mood: DISABLED (experiment) — song mood is '{song['mood']}'")  # audit trail
+    if user_prefs.get("mood") == song["mood"]:
+        score += 2.0
+        reasons.append(f"mood match: '{song['mood']}' (+2.0)")
+    else:
+        reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
 
     # --- Categorical: genre (+1.5 exact match, else +0.0) ---
     if user_prefs.get("genre") == song["genre"]:
@@ -207,6 +229,58 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     tempo_pts = 0.2 * (1 - abs(user_tempo_norm - song_tempo_norm))
     score += tempo_pts
     reasons.append(f"tempo {song['tempo_bpm']:.0f} BPM vs target {user_prefs.get('target_tempo_bpm', 100.0):.0f} BPM (+{tempo_pts:.2f})")
+
+    # --- New: mood tags (up to 3 matching tags × 0.5 = max 1.5) ---
+    user_tags = set(user_prefs.get("desired_mood_tags", []))
+    song_tags = set(song.get("mood_tags", []))
+    if user_tags:
+        matches = user_tags & song_tags
+        tag_pts = min(len(matches), 3) * 0.5
+        score += tag_pts
+        match_str = ", ".join(sorted(matches)) if matches else "none"
+        reasons.append(f"mood tags matched: [{match_str}] (+{tag_pts:.2f})")
+    else:
+        reasons.append("mood tags: not specified (+0.00)")
+
+    # --- New: popularity (max 0.8) ---
+    # "mainstream" rewards high popularity, "underground" rewards low,
+    # "neutral" uses proximity to a target value.
+    pop_pref = user_prefs.get("popularity_preference", "neutral")
+    song_pop = song.get("popularity", 50)
+    if pop_pref == "mainstream":
+        pop_pts = 0.8 * (song_pop / 100)
+        reasons.append(f"popularity {song_pop}/100 — mainstream preference (+{pop_pts:.2f})")
+    elif pop_pref == "underground":
+        pop_pts = 0.8 * (1 - song_pop / 100)
+        reasons.append(f"popularity {song_pop}/100 — underground preference (+{pop_pts:.2f})")
+    else:
+        target_pop = user_prefs.get("target_popularity", 50)
+        pop_pts = 0.8 * (1 - abs(target_pop - song_pop) / 100)
+        reasons.append(f"popularity {song_pop}/100 vs target {int(target_pop)}/100 (+{pop_pts:.2f})")
+    score += pop_pts
+
+    # --- New: release decade (max 0.7; penalty of 0.25 per decade away, floor at 0) ---
+    target_decade = user_prefs.get("target_decade", 2010)
+    song_decade = song.get("release_decade", 2010)
+    decade_gap = abs(target_decade - song_decade) / 10
+    decade_pts = max(0.0, 0.7 * (1.0 - 0.25 * decade_gap))
+    score += decade_pts
+    reasons.append(f"decade: {song_decade}s vs target {target_decade}s (+{decade_pts:.2f})")
+
+    # --- New: liveness (max 0.4) ---
+    liveness_pts = 0.4 * (1 - abs(user_prefs.get("target_liveness", 0.15) - song.get("liveness", 0.10)))
+    score += liveness_pts
+    reasons.append(f"liveness {song.get('liveness', 0.10):.2f} vs target {user_prefs.get('target_liveness', 0.15):.2f} (+{liveness_pts:.2f})")
+
+    # --- New: explicit filter (max 0.3; blocked if user disallows explicit content) ---
+    allow_explicit = user_prefs.get("allow_explicit", True)
+    is_explicit = bool(song.get("explicit", 0))
+    if not allow_explicit and is_explicit:
+        reasons.append("explicit: content blocked by user preference (+0.00)")
+    else:
+        score += 0.3
+        label = "explicit" if is_explicit else "clean"
+        reasons.append(f"explicit: {label} — permitted (+0.30)")
 
     return score, reasons
 
