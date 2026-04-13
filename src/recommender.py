@@ -145,17 +145,23 @@ def load_songs(csv_path: str) -> List[Dict]:
     return songs
 
 def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
-    """Score one song against user preferences (0.0–10.0) and return a list of reasons."""
+    """Score one song against user preferences and return a list of reasons.
+
+    EXPERIMENT — mood check disabled. Max possible score is now 8.0 (was 10.0).
+    Re-enable the mood block below to restore full scoring.
+    """
     TEMPO_MIN, TEMPO_MAX = 60.0, 180.0
     score = 0.0
     reasons = []
 
     # --- Categorical: mood (+2.0 exact match, else +0.0) ---
-    if user_prefs.get("mood") == song["mood"]:
-        score += 2.0
-        reasons.append(f"mood match: '{song['mood']}' (+2.0)")
-    else:
-        reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
+    # DISABLED for sensitivity experiment — comment back in to restore
+    # if user_prefs.get("mood") == song["mood"]:
+    #     score += 2.0
+    #     reasons.append(f"mood match: '{song['mood']}' (+2.0)")
+    # else:
+    #     reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
+    reasons.append(f"mood: DISABLED (experiment) — song mood is '{song['mood']}'")  # audit trail
 
     # --- Categorical: genre (+1.5 exact match, else +0.0) ---
     if user_prefs.get("genre") == song["genre"]:
