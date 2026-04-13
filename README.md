@@ -61,6 +61,7 @@ The system prioritizes mood over genre since I think users care more about their
 <a href="IMG7.png" target="_blank"><img src="IMG7.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 9" /></a>
 <a href="IMG8.png" target="_blank"><img src="IMG8.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 10" /></a>
 <a href="IMG9.png" target="_blank"><img src="IMG9.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 11" /></a>
+<a href="IMG12.png" target="_blank"><img src="IMG12.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 14" /></a>
 <a href="IMG10.png" target="_blank"><img src="IMG10.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 12" /></a>
 <a href="IMG11.png" target="_blank"><img src="IMG11.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 13" /></a>
 
