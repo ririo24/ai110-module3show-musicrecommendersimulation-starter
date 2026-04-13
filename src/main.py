@@ -9,6 +9,8 @@ You will implement the functions in recommender.py:
 - recommend_songs
 """
 
+import re
+from tabulate import tabulate
 from recommender import load_songs, recommend_songs, STRATEGY_WEIGHTS
 
 
@@ -113,6 +115,25 @@ ADVERSARIAL_PROFILES = {
 }
 
 
+def _score_bar(score: float, max_score: float = 14.0, width: int = 10) -> str:
+    """Return a block-character progress bar for the given score."""
+    filled = max(0, min(width, round((score / max_score) * width)))
+    return "█" * filled + "░" * (width - filled) + f"  {score:.1f}"
+
+
+def _top_reasons(explanation: str, n: int = 3) -> list:
+    """Return the top n reasons sorted by point contribution, skipping zero-point entries."""
+    parts = explanation.split(" | ")
+    scored_parts = []
+    for part in parts:
+        m = re.search(r'\(\+(\d+\.?\d*)\)', part)
+        pts = float(m.group(1)) if m else 0.0
+        if pts > 0:
+            scored_parts.append((pts, part))
+    scored_parts.sort(reverse=True)
+    return [p for _, p in scored_parts[:n]]
+
+
 def print_recommendations(profile_name: str, user_prefs: dict, recommendations: list,
                           strategy: str = "balanced", adversarial: bool = False) -> None:
     """Print a formatted recommendations block for one profile."""
@@ -121,23 +142,30 @@ def print_recommendations(profile_name: str, user_prefs: dict, recommendations: 
     else:
         tag = f"STRATEGY: {strategy.upper().replace('_', '-')}"
     print()
-    print("=" * 52)
+    print("=" * 62)
     print(f"  {profile_name.upper()}")
     print(f"  [{tag}]")
-    print("=" * 52)
     print(f"  Genre: {user_prefs['genre']}  |  Mood: {user_prefs['mood']}  |  Energy: {user_prefs['energy']}")
-    print("=" * 52)
+    print("=" * 62)
 
-    for rank, (song, score, explanation) in enumerate(recommendations, start=1):
-        print()
-        print(f"  #{rank}  {song['title']}  —  {song['artist']}")
-        print(f"       Score: {score:.2f}")
-        print(f"       Genre: {song['genre']}  |  Mood: {song['mood']}")
-        print()
-        for reason in explanation.split(" | "):
-            print(f"         • {reason}")
-        print()
-        print("  " + "-" * 50)
+    table_rows = []
+    for rank, (song, score, _) in enumerate(recommendations, start=1):
+        table_rows.append([
+            f"#{rank}",
+            song["title"],
+            song["artist"],
+            _score_bar(score),
+            song["genre"],
+            song["mood"],
+        ])
+    print(tabulate(table_rows, headers=["", "Title", "Artist", "Score", "Genre", "Mood"],
+                   tablefmt="rounded_outline"))
+
+    for rank, (song, _, explanation) in enumerate(recommendations, start=1):
+        top = _top_reasons(explanation)
+        print(f"\n  #{rank} {song['title']} — top reasons:")
+        for reason in top:
+            print(f"       • {reason}")
 
     print()
 
@@ -149,19 +177,23 @@ def print_diversity_comparison(profile_name: str, user_prefs: dict,
     with_div = recommend_songs(user_prefs, songs, k=k, strategy="balanced",
                                artist_penalty=2.0, genre_penalty=1.0)
 
-    width = 26
     print()
-    print("=" * 56)
+    print("=" * 62)
     print(f"  DIVERSITY COMPARISON — {profile_name.upper()}")
     print(f"  artist_penalty=2.0  |  genre_penalty=1.0")
-    print("=" * 56)
-    print(f"  {'NO DIVERSITY':<{width}}  {'WITH DIVERSITY':<{width}}")
-    print("  " + "-" * 54)
+    print("=" * 62)
+
+    rows = []
     for i, ((s1, sc1, _), (s2, sc2, _)) in enumerate(zip(without, with_div), 1):
-        left  = f"#{i} {s1['title']} ({sc1:.1f})"
-        right = f"#{i} {s2['title']} ({sc2:.1f})"
-        marker = "  " if s1["title"] == s2["title"] else "←"
-        print(f"  {left:<{width}}  {right:<{width}} {marker}")
+        changed = "" if s1["title"] == s2["title"] else "←"
+        rows.append([
+            f"#{i}",
+            f"{s1['title']} ({sc1:.1f})",
+            f"{s2['title']} ({sc2:.1f})",
+            changed,
+        ])
+    print(tabulate(rows, headers=["", "No Diversity", "With Diversity", ""],
+                   tablefmt="rounded_outline"))
     print()
 
 
