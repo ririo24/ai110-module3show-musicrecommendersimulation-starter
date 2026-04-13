@@ -49,11 +49,77 @@ PROFILES = {
 }
 
 
-def print_recommendations(profile_name: str, user_prefs: dict, recommendations: list) -> None:
+# ---------------------------------------------------------------------------
+# Adversarial profiles — designed to expose edge cases and scoring biases.
+# Each has a comment explaining what contradiction or boundary it tests.
+# ---------------------------------------------------------------------------
+ADVERSARIAL_PROFILES = {
+    # Tests: numeric features (high energy) vs categorical mood (sad).
+    # Mood "sad" never appears in rock/metal songs — mood bonus will always be 0.
+    # Does high energy pull Storm Runner to #1 even though the user wants sad music?
+    "Sad Banger": {
+        "genre":                   "rock",
+        "mood":                    "sad",
+        "energy":                  0.92,
+        "likes_acoustic":          False,
+        "target_valence":          0.15,
+        "target_danceability":     0.72,
+        "target_tempo_bpm":        148.0,
+        "target_speechiness":      0.07,
+        "target_instrumentalness": 0.05,
+    },
+    # Tests: both genre and mood are not in the dataset ("country", "content").
+    # Categorical bonuses are permanently 0 for every song.
+    # Exposes the mediocrity bias — scores cluster tightly with no clear winner.
+    "The Fence-Sitter": {
+        "genre":                   "country",
+        "mood":                    "content",
+        "energy":                  0.50,
+        "likes_acoustic":          False,
+        "target_valence":          0.50,
+        "target_danceability":     0.50,
+        "target_tempo_bpm":        110.0,
+        "target_speechiness":      0.05,
+        "target_instrumentalness": 0.10,
+    },
+    # Tests: likes_acoustic=True forces target_acousticness=0.78,
+    # but genre="edm" and mood="euphoric" pull toward low-acousticness electronic songs.
+    # A direct contradiction — can no song satisfy both constraints?
+    "Acoustic Raver": {
+        "genre":                   "edm",
+        "mood":                    "euphoric",
+        "energy":                  0.95,
+        "likes_acoustic":          True,
+        "target_valence":          0.90,
+        "target_danceability":     0.93,
+        "target_tempo_bpm":        138.0,
+        "target_speechiness":      0.03,
+        "target_instrumentalness": 0.80,
+    },
+    # Tests: extreme target_speechiness=0.90 — only Concrete Jungle (0.72) is close.
+    # But speechiness weight is only 0.5 pts max. Does one feature dominate the ranking,
+    # or does it get washed out by the 7 other features?
+    "Speechiness Hunter": {
+        "genre":                   "hip-hop",
+        "mood":                    "energetic",
+        "energy":                  0.85,
+        "likes_acoustic":          False,
+        "target_valence":          0.62,
+        "target_danceability":     0.84,
+        "target_tempo_bpm":        95.0,
+        "target_speechiness":      0.90,
+        "target_instrumentalness": 0.02,
+    },
+}
+
+
+def print_recommendations(profile_name: str, user_prefs: dict, recommendations: list, adversarial: bool = False) -> None:
     """Print a formatted recommendations block for one profile."""
+    tag = "ADVERSARIAL TEST" if adversarial else "TOP PICKS FOR YOUR PROFILE"
     print()
     print("=" * 52)
     print(f"  {profile_name.upper()}")
+    print(f"  [{tag}]")
     print("=" * 52)
     print(f"  Genre: {user_prefs['genre']}  |  Mood: {user_prefs['mood']}  |  Energy: {user_prefs['energy']}")
     print("=" * 52)
@@ -78,6 +144,10 @@ def main() -> None:
     for profile_name, user_prefs in PROFILES.items():
         recommendations = recommend_songs(user_prefs, songs, k=5)
         print_recommendations(profile_name, user_prefs, recommendations)
+
+    for profile_name, user_prefs in ADVERSARIAL_PROFILES.items():
+        recommendations = recommend_songs(user_prefs, songs, k=5)
+        print_recommendations(profile_name, user_prefs, recommendations, adversarial=True)
 
 
 if __name__ == "__main__":

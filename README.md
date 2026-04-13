@@ -50,6 +50,21 @@ The system prioritizes mood over genre since I think users care more about their
 <a href="musicRecommenderIMG2.png" target="_blank"><img src="musicRecommenderIMG2.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 2" /></a>
 ---
 
+## Stress Testing with Diverse Profiles
+
+<a href="IMG1.png" target="_blank"><img src="IMG1.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 3" /></a>
+<a href="IMG2.png" target="_blank"><img src="IMG2.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 4" /></a>
+<a href="IMG3.png" target="_blank"><img src="IMG3.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 5" /></a>
+<a href="IMG4.png" target="_blank"><img src="IMG4.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 6" /></a>
+<a href="IMG5.png" target="_blank"><img src="IMG5.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 7" /></a>
+<a href="IMG6.png" target="_blank"><img src="IMG6.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 8" /></a>
+<a href="IMG7.png" target="_blank"><img src="IMG7.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 9" /></a>
+<a href="IMG8.png" target="_blank"><img src="IMG8.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 10" /></a>
+<a href="IMG9.png" target="_blank"><img src="IMG9.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 11" /></a>
+<a href="IMG10.png" target="_blank"><img src="IMG10.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 12" /></a>
+<a href="IMG11.png" target="_blank"><img src="IMG11.png" title="Music Recommender" width="300" alt="Music Recommender Terminal Output 13" /></a>
+
+---
 ## Getting Started
 
 ### Setup
