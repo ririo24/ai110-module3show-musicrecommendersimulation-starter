@@ -164,131 +164,177 @@ def load_songs(csv_path: str) -> List[Dict]:
     print(f"  Loaded {len(songs)} songs.")
     return songs
 
-def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
+# ---------------------------------------------------------------------------
+# Ranking strategies — Strategy pattern via weight configurations.
+#
+# Each entry is a dict of feature → max points. score_song() reads these
+# instead of hardcoded numbers, so swapping a strategy changes the entire
+# ranking without touching any other logic.
+#
+# To add a new strategy: add a new key here. No other code needs to change.
+# ---------------------------------------------------------------------------
+STRATEGY_WEIGHTS: Dict[str, Dict[str, float]] = {
+    # Default: all features carry balanced influence.
+    "balanced": {
+        "mood": 2.0, "genre": 1.5, "energy": 2.0, "valence": 1.5,
+        "acousticness": 1.0, "danceability": 0.8, "speechiness": 0.5,
+        "instrumentalness": 0.5, "tempo": 0.2,
+        "mood_tags": 1.5, "popularity": 0.8, "decade": 0.7,
+        "liveness": 0.4, "explicit": 0.3,
+    },
+    # Genre-First: genre match is the primary filter; everything else is tiebreaker.
+    "genre_first": {
+        "mood": 0.5, "genre": 5.0, "energy": 1.5, "valence": 1.0,
+        "acousticness": 0.7, "danceability": 0.5, "speechiness": 0.3,
+        "instrumentalness": 0.3, "tempo": 0.2,
+        "mood_tags": 0.5, "popularity": 0.5, "decade": 0.5,
+        "liveness": 0.2, "explicit": 0.3,
+    },
+    # Mood-First: emotional resonance drives the ranking; genre is secondary.
+    "mood_first": {
+        "mood": 5.0, "genre": 0.5, "energy": 1.0, "valence": 3.0,
+        "acousticness": 0.5, "danceability": 0.5, "speechiness": 0.3,
+        "instrumentalness": 0.3, "tempo": 0.1,
+        "mood_tags": 3.0, "popularity": 0.3, "decade": 0.3,
+        "liveness": 0.2, "explicit": 0.3,
+    },
+    # Energy-Focused: physical intensity (energy, tempo, danceability) dominates.
+    "energy_focused": {
+        "mood": 0.5, "genre": 0.5, "energy": 5.0, "valence": 1.0,
+        "acousticness": 0.8, "danceability": 2.0, "speechiness": 0.3,
+        "instrumentalness": 0.3, "tempo": 1.5,
+        "mood_tags": 0.3, "popularity": 0.3, "decade": 0.2,
+        "liveness": 0.2, "explicit": 0.3,
+    },
+}
+
+
+def score_song(user_prefs: Dict, song: Dict,
+               weights: Dict = None) -> Tuple[float, List[str]]:
     """Score one song against user preferences and return a list of reasons.
 
-    Score breakdown (max ~13.7):
-      Original features  — mood(2.0) genre(1.5) energy(2.0) valence(1.5)
-                           acousticness(1.0) danceability(0.8) speechiness(0.5)
-                           instrumentalness(0.5) tempo(0.2)          = 10.0
-      New features       — mood_tags(1.5) popularity(0.8) decade(0.7)
-                           liveness(0.4) explicit(0.3)               =  3.7
+    Pass a custom weights dict or let it default to the 'balanced' strategy.
+    Max possible score depends on the active strategy (~10–14 pts).
     """
+    W = weights if weights is not None else STRATEGY_WEIGHTS["balanced"]
     TEMPO_MIN, TEMPO_MAX = 60.0, 180.0
     score = 0.0
     reasons = []
 
-    # --- Categorical: mood (+2.0 exact match, else +0.0) ---
+    # --- Categorical: mood ---
     if user_prefs.get("mood") == song["mood"]:
-        score += 2.0
-        reasons.append(f"mood match: '{song['mood']}' (+2.0)")
+        score += W["mood"]
+        reasons.append(f"mood match: '{song['mood']}' (+{W['mood']:.1f})")
     else:
         reasons.append(f"mood: no match ('{user_prefs.get('mood')}' ≠ '{song['mood']}') (+0.0)")
 
-    # --- Categorical: genre (+1.5 exact match, else +0.0) ---
+    # --- Categorical: genre ---
     if user_prefs.get("genre") == song["genre"]:
-        score += 1.5
-        reasons.append(f"genre match: '{song['genre']}' (+1.5)")
+        score += W["genre"]
+        reasons.append(f"genre match: '{song['genre']}' (+{W['genre']:.1f})")
     else:
         reasons.append(f"genre: no match ('{user_prefs.get('genre')}' ≠ '{song['genre']}') (+0.0)")
 
-    # --- Numeric: energy (+2.0 max) ---
-    energy_pts = 2.0 * (1 - abs(user_prefs.get("energy", 0.5) - song["energy"]))
+    # --- Numeric: energy ---
+    energy_pts = W["energy"] * (1 - abs(user_prefs.get("energy", 0.5) - song["energy"]))
     score += energy_pts
     reasons.append(f"energy {song['energy']:.2f} vs target {user_prefs.get('energy', 0.5):.2f} (+{energy_pts:.2f})")
 
-    # --- Numeric: valence (+1.5 max) ---
-    valence_pts = 1.5 * (1 - abs(user_prefs.get("target_valence", 0.5) - song["valence"]))
+    # --- Numeric: valence ---
+    valence_pts = W["valence"] * (1 - abs(user_prefs.get("target_valence", 0.5) - song["valence"]))
     score += valence_pts
     reasons.append(f"valence {song['valence']:.2f} vs target {user_prefs.get('target_valence', 0.5):.2f} (+{valence_pts:.2f})")
 
-    # --- Numeric: acousticness (+1.0 max) ---
+    # --- Numeric: acousticness ---
     target_acousticness = 0.78 if user_prefs.get("likes_acoustic", False) else 0.18
-    acousticness_pts = 1.0 * (1 - abs(target_acousticness - song["acousticness"]))
+    acousticness_pts = W["acousticness"] * (1 - abs(target_acousticness - song["acousticness"]))
     score += acousticness_pts
     reasons.append(f"acousticness {song['acousticness']:.2f} vs target {target_acousticness:.2f} (+{acousticness_pts:.2f})")
 
-    # --- Numeric: danceability (+0.8 max) ---
-    dance_pts = 0.8 * (1 - abs(user_prefs.get("target_danceability", 0.5) - song["danceability"]))
+    # --- Numeric: danceability ---
+    dance_pts = W["danceability"] * (1 - abs(user_prefs.get("target_danceability", 0.5) - song["danceability"]))
     score += dance_pts
     reasons.append(f"danceability {song['danceability']:.2f} vs target {user_prefs.get('target_danceability', 0.5):.2f} (+{dance_pts:.2f})")
 
-    # --- Numeric: speechiness (+0.5 max) ---
-    speech_pts = 0.5 * (1 - abs(user_prefs.get("target_speechiness", 0.05) - song["speechiness"]))
+    # --- Numeric: speechiness ---
+    speech_pts = W["speechiness"] * (1 - abs(user_prefs.get("target_speechiness", 0.05) - song["speechiness"]))
     score += speech_pts
     reasons.append(f"speechiness {song['speechiness']:.2f} vs target {user_prefs.get('target_speechiness', 0.05):.2f} (+{speech_pts:.2f})")
 
-    # --- Numeric: instrumentalness (+0.5 max) ---
-    instr_pts = 0.5 * (1 - abs(user_prefs.get("target_instrumentalness", 0.30) - song["instrumentalness"]))
+    # --- Numeric: instrumentalness ---
+    instr_pts = W["instrumentalness"] * (1 - abs(user_prefs.get("target_instrumentalness", 0.30) - song["instrumentalness"]))
     score += instr_pts
     reasons.append(f"instrumentalness {song['instrumentalness']:.2f} vs target {user_prefs.get('target_instrumentalness', 0.30):.2f} (+{instr_pts:.2f})")
 
-    # --- Numeric: tempo (+0.2 max, normalized to 0–1 before comparison) ---
+    # --- Numeric: tempo (normalized to 0–1 before comparison) ---
     song_tempo_norm = (song["tempo_bpm"] - TEMPO_MIN) / (TEMPO_MAX - TEMPO_MIN)
     user_tempo_norm = (user_prefs.get("target_tempo_bpm", 100.0) - TEMPO_MIN) / (TEMPO_MAX - TEMPO_MIN)
-    tempo_pts = 0.2 * (1 - abs(user_tempo_norm - song_tempo_norm))
+    tempo_pts = W["tempo"] * (1 - abs(user_tempo_norm - song_tempo_norm))
     score += tempo_pts
     reasons.append(f"tempo {song['tempo_bpm']:.0f} BPM vs target {user_prefs.get('target_tempo_bpm', 100.0):.0f} BPM (+{tempo_pts:.2f})")
 
-    # --- New: mood tags (up to 3 matching tags × 0.5 = max 1.5) ---
+    # --- New: mood tags (fraction of max weight based on tag overlap, cap 3 matches) ---
     user_tags = set(user_prefs.get("desired_mood_tags", []))
     song_tags = set(song.get("mood_tags", []))
     if user_tags:
         matches = user_tags & song_tags
-        tag_pts = min(len(matches), 3) * 0.5
+        tag_pts = (min(len(matches), 3) / 3) * W["mood_tags"]
         score += tag_pts
         match_str = ", ".join(sorted(matches)) if matches else "none"
         reasons.append(f"mood tags matched: [{match_str}] (+{tag_pts:.2f})")
     else:
         reasons.append("mood tags: not specified (+0.00)")
 
-    # --- New: popularity (max 0.8) ---
-    # "mainstream" rewards high popularity, "underground" rewards low,
-    # "neutral" uses proximity to a target value.
+    # --- New: popularity ---
     pop_pref = user_prefs.get("popularity_preference", "neutral")
     song_pop = song.get("popularity", 50)
     if pop_pref == "mainstream":
-        pop_pts = 0.8 * (song_pop / 100)
+        pop_pts = W["popularity"] * (song_pop / 100)
         reasons.append(f"popularity {song_pop}/100 — mainstream preference (+{pop_pts:.2f})")
     elif pop_pref == "underground":
-        pop_pts = 0.8 * (1 - song_pop / 100)
+        pop_pts = W["popularity"] * (1 - song_pop / 100)
         reasons.append(f"popularity {song_pop}/100 — underground preference (+{pop_pts:.2f})")
     else:
         target_pop = user_prefs.get("target_popularity", 50)
-        pop_pts = 0.8 * (1 - abs(target_pop - song_pop) / 100)
+        pop_pts = W["popularity"] * (1 - abs(target_pop - song_pop) / 100)
         reasons.append(f"popularity {song_pop}/100 vs target {int(target_pop)}/100 (+{pop_pts:.2f})")
     score += pop_pts
 
-    # --- New: release decade (max 0.7; penalty of 0.25 per decade away, floor at 0) ---
+    # --- New: release decade (penalty of 0.25 per decade away, floor at 0) ---
     target_decade = user_prefs.get("target_decade", 2010)
     song_decade = song.get("release_decade", 2010)
     decade_gap = abs(target_decade - song_decade) / 10
-    decade_pts = max(0.0, 0.7 * (1.0 - 0.25 * decade_gap))
+    decade_pts = max(0.0, W["decade"] * (1.0 - 0.25 * decade_gap))
     score += decade_pts
     reasons.append(f"decade: {song_decade}s vs target {target_decade}s (+{decade_pts:.2f})")
 
-    # --- New: liveness (max 0.4) ---
-    liveness_pts = 0.4 * (1 - abs(user_prefs.get("target_liveness", 0.15) - song.get("liveness", 0.10)))
+    # --- New: liveness ---
+    liveness_pts = W["liveness"] * (1 - abs(user_prefs.get("target_liveness", 0.15) - song.get("liveness", 0.10)))
     score += liveness_pts
     reasons.append(f"liveness {song.get('liveness', 0.10):.2f} vs target {user_prefs.get('target_liveness', 0.15):.2f} (+{liveness_pts:.2f})")
 
-    # --- New: explicit filter (max 0.3; blocked if user disallows explicit content) ---
+    # --- New: explicit filter (hard block if user disallows; otherwise full weight) ---
     allow_explicit = user_prefs.get("allow_explicit", True)
     is_explicit = bool(song.get("explicit", 0))
     if not allow_explicit and is_explicit:
         reasons.append("explicit: content blocked by user preference (+0.00)")
     else:
-        score += 0.3
+        score += W["explicit"]
         label = "explicit" if is_explicit else "clean"
-        reasons.append(f"explicit: {label} — permitted (+0.30)")
+        reasons.append(f"explicit: {label} — permitted (+{W['explicit']:.2f})")
 
     return score, reasons
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
-    """Score every song in the catalog and return the top k as (song, score, explanation) tuples."""
+def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5,
+                    strategy: str = "balanced") -> List[Tuple[Dict, float, str]]:
+    """Score every song in the catalog and return the top k as (song, score, explanation) tuples.
+
+    Pass strategy='genre_first', 'mood_first', or 'energy_focused' to change ranking behaviour.
+    """
+    weights = STRATEGY_WEIGHTS.get(strategy, STRATEGY_WEIGHTS["balanced"])
     scored = []
     for song in songs:
-        score, reasons = score_song(user_prefs, song)
+        score, reasons = score_song(user_prefs, song, weights=weights)
         scored.append((song, score, " | ".join(reasons)))
 
     return sorted(scored, key=lambda x: x[1], reverse=True)[:k]

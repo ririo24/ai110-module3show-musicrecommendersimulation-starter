@@ -113,9 +113,13 @@ ADVERSARIAL_PROFILES = {
 }
 
 
-def print_recommendations(profile_name: str, user_prefs: dict, recommendations: list, adversarial: bool = False) -> None:
+def print_recommendations(profile_name: str, user_prefs: dict, recommendations: list,
+                          strategy: str = "balanced", adversarial: bool = False) -> None:
     """Print a formatted recommendations block for one profile."""
-    tag = "ADVERSARIAL TEST" if adversarial else "TOP PICKS FOR YOUR PROFILE"
+    if adversarial:
+        tag = "ADVERSARIAL TEST"
+    else:
+        tag = f"STRATEGY: {strategy.upper().replace('_', '-')}"
     print()
     print("=" * 52)
     print(f"  {profile_name.upper()}")
@@ -127,7 +131,7 @@ def print_recommendations(profile_name: str, user_prefs: dict, recommendations: 
     for rank, (song, score, explanation) in enumerate(recommendations, start=1):
         print()
         print(f"  #{rank}  {song['title']}  —  {song['artist']}")
-        print(f"       Score: {score:.2f} / 10.0")
+        print(f"       Score: {score:.2f}")
         print(f"       Genre: {song['genre']}  |  Mood: {song['mood']}")
         print()
         for reason in explanation.split(" | "):
@@ -141,12 +145,16 @@ def print_recommendations(profile_name: str, user_prefs: dict, recommendations: 
 def main() -> None:
     songs = load_songs("data/songs.csv")
 
+    # --- Standard profiles, each run under all four strategies ---
+    # Swap the strategy name to see how rankings shift.
     for profile_name, user_prefs in PROFILES.items():
-        recommendations = recommend_songs(user_prefs, songs, k=5)
-        print_recommendations(profile_name, user_prefs, recommendations)
+        for strategy in ("balanced", "genre_first", "mood_first", "energy_focused"):
+            recommendations = recommend_songs(user_prefs, songs, k=3, strategy=strategy)
+            print_recommendations(profile_name, user_prefs, recommendations, strategy=strategy)
 
+    # --- Adversarial profiles (balanced strategy only) ---
     for profile_name, user_prefs in ADVERSARIAL_PROFILES.items():
-        recommendations = recommend_songs(user_prefs, songs, k=5)
+        recommendations = recommend_songs(user_prefs, songs, k=3)
         print_recommendations(profile_name, user_prefs, recommendations, adversarial=True)
 
 
